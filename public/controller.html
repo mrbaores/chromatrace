@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>CHROMATRACE - Manette</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="controller-page">
+    <main class="controller-app">
+        <section id="join-screen" class="card neon-card">
+            <h1 class="logo-title">CHROMATRACE</h1>
+            <p class="subtitle">Entre ton pseudo et choisis ta couleur.</p>
+
+            <label class="field-label" for="player-name">Pseudo</label>
+            <input id="player-name" class="text-input" type="text" maxlength="14" placeholder="Ex: Cyber_01" />
+
+            <p class="field-label">Couleur</p>
+            <div id="color-list" class="color-list"></div>
+
+            <button id="join-button" class="main-button">REJOINDRE</button>
+            <p id="join-message" class="helper-text"></p>
+        </section>
+
+        <section id="play-screen" class="play-screen hidden">
+            <header class="hud-row card neon-card">
+                <div>
+                    <span class="mini-label">PSEUDO</span>
+                    <strong id="hud-name">---</strong>
+                </div>
+                <div>
+                    <span class="mini-label">SURFACE</span>
+                    <strong id="hud-score">0</strong>
+                </div>
+                <div>
+                    <span class="mini-label">STATUT</span>
+                    <strong id="hud-status">Vivant</strong>
+                </div>
+            </header>
+
+            <section class="joystick-wrapper card neon-card">
+                <div id="joystick-base" class="joystick-base">
+                    <div id="joystick-knob" class="joystick-knob"></div>
+                </div>
+            </section>
+
+            <footer class="status-row card neon-card">
+                <span id="status-boost" class="status-pill">Boost OFF</span>
+                <span id="status-shield" class="status-pill">Shield OFF</span>
+            </footer>
+        </section>
+    </main>
+
+    <script src="/controller.js"></script>
+</body>
+</html>
