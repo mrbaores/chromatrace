@@ -46,6 +46,12 @@ class ChromaScene extends Phaser.Scene {
             color: '#e2e8f0'
         }).setDepth(10);
 
+        this.infoText= this.add.text(29,100,'Instruction du jouer ' ,{ 
+            fontFamily :'Arial',
+            fontSize :'18px',
+            color :  #a5f3fc }).setDepth(10);
+        
+
         this.leaderboardTitle = this.add.text(1070, 24, 'TOP 5', {
             fontFamily: 'Arial',
             fontSize: '28px',
