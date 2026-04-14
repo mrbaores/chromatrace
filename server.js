@@ -4,8 +4,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 const PORT = process.env.PORT || 3000;
-const COLS = 80;
-const ROWS = 45;
+const COLS = 100;
+const ROWS = 80;
 const CELL_SIZE = 16;
 const TICK_MS = 120;
 const STATE_MS = 100;
@@ -25,20 +25,26 @@ const COLORS = [
 ];
 
 const SPAWN_POINTS = [
+    // Coins
     { x: 8, y: 8 }, { x: COLS - 9, y: 8 },
     { x: 8, y: ROWS - 9 }, { x: COLS - 9, y: ROWS - 9 },
+    // Côtés
     { x: Math.floor(COLS / 2), y: 8 }, { x: Math.floor(COLS / 2), y: ROWS - 9 },
     { x: 8, y: Math.floor(ROWS / 2) }, { x: COLS - 9, y: Math.floor(ROWS / 2) },
-    { x: 12, y: 12 }, { x: COLS - 13, y: 12 },
-    { x: 12, y: ROWS - 13 }, { x: COLS - 13, y: ROWS - 13 },
-    { x: Math.floor(COLS * 0.3), y: Math.floor(ROWS * 0.3) },
-    { x: Math.floor(COLS * 0.7), y: Math.floor(ROWS * 0.3) },
-    { x: Math.floor(COLS * 0.3), y: Math.floor(ROWS * 0.7) },
-    { x: Math.floor(COLS * 0.7), y: Math.floor(ROWS * 0.7) },
+    // Quarts
+    { x: Math.floor(COLS / 4), y: Math.floor(ROWS / 4) },
+    { x: Math.floor(COLS * 3 / 4), y: Math.floor(ROWS / 4) },
+    { x: Math.floor(COLS / 4), y: Math.floor(ROWS * 3 / 4) },
+    { x: Math.floor(COLS * 3 / 4), y: Math.floor(ROWS * 3 / 4) },
+    // Centre + zones
+    { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
     { x: Math.floor(COLS / 3), y: Math.floor(ROWS / 3) },
     { x: Math.floor(COLS * 2 / 3), y: Math.floor(ROWS / 3) },
     { x: Math.floor(COLS / 3), y: Math.floor(ROWS * 2 / 3) },
-    { x: Math.floor(COLS * 2 / 3), y: Math.floor(ROWS * 2 / 3) }
+    { x: Math.floor(COLS * 2 / 3), y: Math.floor(ROWS * 2 / 3) },
+    // Positions supplémentaires
+    { x: 20, y: 15 }, { x: COLS - 21, y: 15 },
+    { x: 20, y: ROWS - 16 }, { x: COLS - 21, y: ROWS - 16 }
 ];
 
 const app = express();
@@ -55,7 +61,13 @@ const state = {
     items: [],
     nextItemId: 1,
     nextItemAt: Date.now() + randomInt(ITEM_MIN_MS, ITEM_MAX_MS),
-    startedAt: Date.now()
+    startedAt: Date.now(),
+    gameStarted: false,
+    gameConfig: {
+        gameDuration: 180,
+        itemsEnabled: true,
+        boostEnabled: true
+    }
 };
 
 function createGrid() {
@@ -445,7 +457,27 @@ function emitState() {
     }
 }
 
+// ========================================================
+// 🔌 CONNEXION ET ÉVÉNEMENTS SOCKET
+// ========================================================
+
+/**
+ * Émet la liste des joueurs actuels à tous les clients lobby
+ */
+function broadcastPlayerList() {
+    const playersList = Array.from(state.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        numId: p.numId
+    }));
+
+    io.emit('playerJoined', playersList);
+}
+
 io.on('connection', (socket) => {
+    console.log(`✓ Client connecté: ${socket.id}`);
+
     socket.emit('welcome', {
         cols: COLS,
         rows: ROWS,
@@ -453,6 +485,10 @@ io.on('connection', (socket) => {
         colors: COLORS,
         controllerUrl: '/controller.html'
     });
+
+    // ========================================================
+    // JOIN GAME - Joueur rejoint la partie (manette)
+    // ========================================================
 
     socket.on('joinGame', (payload, callback) => {
         const rawName = typeof payload?.name === 'string' ? payload.name.trim() : '';
@@ -486,7 +522,11 @@ io.on('connection', (socket) => {
         state.nextPlayerNumId += 1;
         state.players.set(player.id, player);
         state.socketToPlayer.set(socket.id, player.id);
-        respawnPlayer(player);
+
+        // Si la partie a started, respawn le joueur immédiatement
+        if (state.gameStarted) {
+            respawnPlayer(player);
+        }
 
         callback?.({
             ok: true,
@@ -495,45 +535,77 @@ io.on('connection', (socket) => {
             name: player.name,
             color: player.color
         });
+
+        console.log(`✓ ${player.name} rejoint la partie`);
+        broadcastPlayerList();
     });
+
+    // ========================================================
+    // PLAYER INPUT - Données du joystick
+    // ========================================================
 
     socket.on('playerInput', (payload) => {
         const playerId = state.socketToPlayer.get(socket.id);
-        if (!playerId) {
-            return;
-        }
+        if (!playerId) return;
+
         const player = state.players.get(playerId);
-        if (!player) {
-            return;
-        }
+        if (!player) return;
 
         player.disconnectedAt = 0;
         player.socketId = socket.id;
 
-        // Validation et normalisation des inputs
         const x = Number(payload?.x) || 0;
         const y = Number(payload?.y) || 0;
         player.inputX = Math.max(-1, Math.min(1, x));
         player.inputY = Math.max(-1, Math.min(1, y));
     });
 
+    // ========================================================
+    // START GAME - Démarrage de la partie (depuis le lobby)
+    // ========================================================
+
+    socket.on('startGame', (config) => {
+        if (state.gameStarted) return;
+
+        state.gameStarted = true;
+        state.gameConfig = {
+            gameDuration: config?.gameDuration || 180,
+            itemsEnabled: config?.itemsEnabled !== false,
+            boostEnabled: config?.boostEnabled !== false
+        };
+
+        // Respawn tous les joueurs connectés
+        for (const player of state.players.values()) {
+            if (!player.disconnectedAt) {
+                respawnPlayer(player);
+            }
+        }
+
+        state.startedAt = Date.now();
+        io.emit('gameStarted', state.gameConfig);
+        console.log(`✓ Partie lancée: ${state.players.size} joueurs`);
+    });
+
+    // ========================================================
+    // DISCONNECT - Déconnexion d'un client
+    // ========================================================
+
     socket.on('disconnect', () => {
         const playerId = state.socketToPlayer.get(socket.id);
         state.socketToPlayer.delete(socket.id);
 
-        if (!playerId) {
-            return;
-        }
+        if (!playerId) return;
 
         const player = state.players.get(playerId);
-        if (!player) {
-            return;
-        }
+        if (!player) return;
 
         player.disconnectedAt = Date.now();
         player.socketId = null;
         player.inputX = 0;
         player.inputY = 0;
+
+        console.log(`✗ ${player.name} déconnecté`);
+        broadcastPlayerList();
     });
 });
 
