@@ -156,3 +156,25 @@ setInterval(() => {
 }, 50);
 
 resetJoystick();
+
+socket.on('gameStateChanged', (payload) => {
+    const stateName = payload.state;
+
+    if (stateName === 'LOBBY') {
+        joinScreen.classList.remove('hidden');
+        playScreen.classList.add('hidden');
+        if (joined) joinMessage.textContent = "En attente du lancement par l'hôte...";
+    } 
+    else if (stateName === 'PLAYING') {
+        if (joined) {
+            joinScreen.classList.add('hidden');
+            playScreen.classList.remove('hidden');
+        }
+    } 
+    else if (stateName === 'FINISHED') {
+        playScreen.classList.add('hidden');
+        joinScreen.classList.remove('hidden');
+        joinMessage.textContent = "Partie terminée ! Regarde l'écran pour les résultats.";
+        joined = false; 
+    }
+});

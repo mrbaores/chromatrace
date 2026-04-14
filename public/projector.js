@@ -12,58 +12,16 @@ class ChromaScene extends Phaser.Scene {
         super('ChromaScene');
     }
 
+    preload() {
+        this.load.image('img-boost', 'assets/boost.png');
+        this.load.image('img-shield', 'assets/shield.png');
+    }
+
     create() {
         this.background = this.add.graphics();
         this.gridGraphics = this.add.graphics();
-        this.itemGraphics = this.add.graphics();
         this.playerGraphics = this.add.graphics();
-        this.uiGraphics = this.add.graphics();
-
-        this.titleText = this.add.text(28, 18, 'CHROMATRACE', {
-            fontFamily: 'Arial',
-            fontSize: '42px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-            stroke: '#06b6d4',
-            strokeThickness: 3
-        }).setDepth(10);
-
-        this.infoText = this.add.text(28, 70, 'En attente de joueurs...', {
-            fontFamily: 'Arial',
-            fontSize: '20px',
-            color: '#a5f3fc'
-        }).setDepth(10);
-
-        this.helpText = this.add.text(28, 100, 'Ouvre /controller.html sur ton téléphone pour rejoindre.', {
-            fontFamily: 'Arial',
-            fontSize: '18px',
-            color: '#cbd5e1'
-        }).setDepth(10);
-
-        this.timerText = this.add.text(28, 130, '', {
-            fontFamily: 'Arial',
-            fontSize: '18px',
-            color: '#e2e8f0'
-        }).setDepth(10);
-
-        this.leaderboardTitle = this.add.text(1070, 24, 'TOP 5', {
-            fontFamily: 'Arial',
-            fontSize: '28px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-            stroke: '#d946ef',
-            strokeThickness: 2
-        }).setOrigin(0.5, 0).setDepth(10);
-
-        this.leaderLines = [];
-        for (let i = 0; i < 5; i += 1) {
-            const text = this.add.text(950, 80 + i * 40, `${i + 1}. ---`, {
-                fontFamily: 'Arial',
-                fontSize: '20px',
-                color: '#e2f3ff'
-            }).setDepth(10);
-            this.leaderLines.push(text);
-        }
+        this.itemSprites = this.add.group(); 
 
         socket.on('state', (payload) => {
             gameData.cols = payload.cols;
@@ -77,9 +35,6 @@ class ChromaScene extends Phaser.Scene {
 
     drawBackground() {
         this.background.clear();
-        this.background.fillStyle(0x0f172a, 1);
-        this.background.fillRect(0, 0, 1280, 720);
-
         this.background.lineStyle(1, 0x12345a, 0.4);
         for (let x = 0; x <= gameData.cols; x += 1) {
             this.background.lineBetween(x * gameData.cellSize, 0, x * gameData.cellSize, gameData.rows * gameData.cellSize);
@@ -93,14 +48,11 @@ class ChromaScene extends Phaser.Scene {
         const state = gameData.state;
         this.drawBackground();
 
-        if (!state) {
-            return;
-        }
+        if (!state) return;
 
         this.drawTerritories(state);
         this.drawItems(state);
         this.drawPlayers(state);
-        this.drawUi(state);
     }
 
     drawTerritories(state) {
@@ -110,9 +62,7 @@ class ChromaScene extends Phaser.Scene {
         for (let y = 0; y < state.rows; y += 1) {
             for (let x = 0; x < state.cols; x += 1) {
                 const owner = state.grid[y][x];
-                if (!owner) {
-                    continue;
-                }
+                if (!owner) continue;
 
                 const color = colorMap.get(owner) || 0xffffff;
                 this.gridGraphics.fillStyle(color, 0.42);
@@ -127,24 +77,19 @@ class ChromaScene extends Phaser.Scene {
     }
 
     drawItems(state) {
-        this.itemGraphics.clear();
+        this.itemSprites.clear(true, true);
+
         state.items.forEach((item) => {
             const x = item.x * state.cellSize + state.cellSize / 2;
             const y = item.y * state.cellSize + state.cellSize / 2;
-            const color = item.type === 'boost' ? 0x84cc16 : 0xeab308;
-            this.itemGraphics.fillStyle(color, 1);
-            this.itemGraphics.lineStyle(2, 0xffffff, 0.9);
-
-            if (item.type === 'boost') {
-                this.itemGraphics.fillTriangle(x - 6, y + 8, x + 2, y + 2, x - 2, y - 2);
-                this.itemGraphics.fillTriangle(x - 2, y - 2, x + 6, y - 8, x + 2, y + 2);
-            } else {
-                this.itemGraphics.strokeCircle(x, y, 7);
-                this.itemGraphics.lineBetween(x, y - 8, x + 7, y);
-                this.itemGraphics.lineBetween(x + 7, y, x, y + 8);
-                this.itemGraphics.lineBetween(x, y + 8, x - 7, y);
-                this.itemGraphics.lineBetween(x - 7, y, x, y - 8);
-            }
+            
+            const textureName = item.type === 'boost' ? 'img-boost' : 'img-shield';
+            
+            const sprite = this.add.sprite(x, y, textureName);
+            
+            sprite.setDisplaySize(state.cellSize * 1.5, state.cellSize * 1.5);
+            
+            this.itemSprites.add(sprite);
         });
     }
 
@@ -156,17 +101,10 @@ class ChromaScene extends Phaser.Scene {
 
             player.trail.forEach((cell) => {
                 this.playerGraphics.fillStyle(color, player.shield ? 0.35 : 0.9);
-                this.playerGraphics.fillRect(
-                    cell.x * state.cellSize + 4,
-                    cell.y * state.cellSize + 4,
-                    state.cellSize - 8,
-                    state.cellSize - 8
-                );
+                this.playerGraphics.fillRect(cell.x * state.cellSize + 4, cell.y * state.cellSize + 4, state.cellSize - 8, state.cellSize - 8);
             });
 
-            if (!player.alive) {
-                return;
-            }
+            if (!player.alive) return;
 
             const px = player.x * state.cellSize + state.cellSize / 2;
             const py = player.y * state.cellSize + state.cellSize / 2;
@@ -185,48 +123,20 @@ class ChromaScene extends Phaser.Scene {
             }
         });
     }
-
-    drawUi(state) {
-        this.uiGraphics.clear();
-        this.uiGraphics.fillStyle(0x020617, 0.82);
-        this.uiGraphics.fillRoundedRect(10, 10, 510, 150, 18);
-        this.uiGraphics.lineStyle(2, 0x06b6d4, 0.75);
-        this.uiGraphics.strokeRoundedRect(10, 10, 510, 150, 18);
-
-        this.uiGraphics.fillStyle(0x020617, 0.84);
-        this.uiGraphics.fillRoundedRect(915, 10, 350, 290, 18);
-        this.uiGraphics.lineStyle(2, 0xd946ef, 0.75);
-        this.uiGraphics.strokeRoundedRect(915, 10, 350, 290, 18);
-
-        const minutes = Math.floor(state.elapsedMs / 60000);
-        const seconds = Math.floor((state.elapsedMs % 60000) / 1000);
-        const clock = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-        this.infoText.setText(`Joueurs connectés : ${state.connectedPlayers}`);
-        this.helpText.setText(`Téléphones : ${window.location.origin}${state.controllerUrl}`);
-        this.timerText.setText(`Temps de partie : ${clock}`);
-
-        this.leaderLines.forEach((line, index) => {
-            const player = state.top5[index];
-            if (!player) {
-                line.setText(`${index + 1}. ---`);
-                line.setColor('#e2f3ff');
-                return;
-            }
-            line.setText(`${index + 1}. ${player.name} - ${player.score}`);
-            line.setColor(player.color);
-        });
-    }
 }
 
 const config = {
     type: Phaser.AUTO,
-    width: 1280,
-    height: 720,
-    backgroundColor: '#0f172a',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 1280,
+        height: 720
+    },
+    transparent: true,
     scene: [ChromaScene],
-    parent: document.body,
-    pixelArt: false
+    parent: 'game-canvas',
+    pixelArt: true 
 };
 
 window.addEventListener('load', () => {

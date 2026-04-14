@@ -1,14 +1,164 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CHROMATRACE - Projecteur</title>
-    <link rel="stylesheet" href="/style.css" />
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHROMATRACE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f172a; font-family: 'Rajdhani', sans-serif; color: #e2e8f0; overflow: hidden; width: 100vw; height: 100vh; }
+
+        #lobby-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 32px; background: radial-gradient(ellipse at center, #1e293b 0%, #0f172a 70%); }
+        #lobby-screen::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(6,182,212,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.05) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+        
+        .logo-title { font-family: 'Orbitron', sans-serif; font-size: 72px; font-weight: 900; letter-spacing: 8px; background: linear-gradient(90deg, #06B6D4, #D946EF, #84CC16, #EAB308); background-size: 300%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: gradientShift 4s linear infinite; filter: drop-shadow(0 0 30px rgba(6,182,212,0.5)); }
+        @keyframes gradientShift { 0% { background-position: 0% } 100% { background-position: 300% } }
+        
+        .lobby-panels { display: flex; gap: 40px; align-items: flex-start; }
+        .panel { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(6,182,212,0.3); border-radius: 12px; padding: 24px; backdrop-filter: blur(10px); }
+        .panel-title { font-family: 'Orbitron', sans-serif; font-size: 14px; letter-spacing: 3px; color: #06B6D4; text-transform: uppercase; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(6,182,212,0.2); }
+        
+        .connect-panel { min-width: 260px; text-align: center; }
+        .connect-url { font-family: 'Orbitron', sans-serif; font-size: 22px; color: #84CC16; padding: 16px; border: 2px solid #84CC16; border-radius: 8px; margin: 16px 0; letter-spacing: 1px; text-shadow: 0 0 20px rgba(132,204,22,0.5); }
+        .connect-hint { font-size: 14px; color: #64748b; line-height: 1.6; }
+        
+        .players-panel { min-width: 280px; max-height: 360px; overflow-y: auto; }
+        .player-count { font-family: 'Orbitron', sans-serif; font-size: 28px; font-weight: 700; margin-bottom: 12px; }
+        #player-list { display: flex; flex-direction: column; gap: 6px; }
+        .player-entry { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; border-left: 3px solid var(--player-color); animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .player-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--player-color); box-shadow: 0 0 8px var(--player-color); }
+        .player-name { font-size: 16px; font-weight: 600; color: var(--player-color); }
+        
+        .settings-panel { min-width: 300px; }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .setting-label { font-size: 15px; font-weight: 600; color: #94a3b8; }
+        .setting-value { display: flex; align-items: center; gap: 10px; }
+        .btn-small { background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.4); color: #06B6D4; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .btn-small:hover { background: rgba(6,182,212,0.3); }
+        .value-display { font-family: 'Orbitron', sans-serif; font-size: 16px; color: #e2e8f0; min-width: 60px; text-align: center; }
+        .toggle-btn { background: rgba(100,116,139,0.2); border: 1px solid rgba(100,116,139,0.4); color: #64748b; padding: 4px 14px; border-radius: 20px; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1px; transition: all 0.2s; }
+        .toggle-btn.on { background: rgba(132,204,22,0.2); border-color: rgba(132,204,22,0.5); color: #84CC16; box-shadow: 0 0 10px rgba(132,204,22,0.2); }
+        
+        .btn-start { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 4px; padding: 18px 64px; background: linear-gradient(135deg, #06B6D4, #0891b2); border: none; border-radius: 8px; color: #0f172a; cursor: pointer; position: relative; overflow: hidden; transition: all 0.2s; box-shadow: 0 0 30px rgba(6,182,212,0.4); }
+        .btn-start:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(6,182,212,0.6); }
+        .btn-start:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        
+        #hud { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 100; pointer-events: none; }
+        #hud.visible { display: block; }
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 20px; background: linear-gradient(to bottom, rgba(15,23,42,0.9), transparent); }
+        .hud-timer { font-family: 'Orbitron', sans-serif; font-size: 42px; font-weight: 900; color: #e2e8f0; text-shadow: 0 0 20px rgba(6,182,212,0.8); letter-spacing: 4px; }
+        .hud-timer.urgent { color: #EF4444; animation: timerPulse 0.5s ease infinite alternate; }
+        @keyframes timerPulse { from { text-shadow: 0 0 10px rgba(239,68,68,0.5); } to { text-shadow: 0 0 30px rgba(239,68,68,1); } }
+        
+        #leaderboard { background: rgba(15,23,42,0.85); border: 1px solid rgba(6,182,212,0.2); border-radius: 10px; padding: 12px 16px; min-width: 220px; }
+        .lb-title { font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 3px; color: #06B6D4; margin-bottom: 8px; }
+        .lb-entry { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 14px; font-weight: 600; }
+        .lb-rank { font-family: 'Orbitron', sans-serif; font-size: 12px; color: #475569; width: 20px; }
+        .lb-color-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+        .lb-pseudo { flex: 1; }
+        .lb-score { font-family: 'Orbitron', sans-serif; font-size: 12px; color: #94a3b8; }
+        
+        /* fin de partie */
+        #end-screen { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(10,15,30,0.95); align-items: center; justify-content: center; flex-direction: column; gap: 40px; }
+        #end-screen.visible { display: flex; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .end-title { font-family: 'Orbitron', sans-serif; font-size: 64px; font-weight: 900; letter-spacing: 8px; background: linear-gradient(90deg, #06B6D4, #D946EF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 20px rgba(217,70,239,0.5)); }
+        
+        .podium { display: flex; gap: 30px; align-items: flex-end; height: 300px; padding-bottom: 20px; border-bottom: 2px solid rgba(255,255,255,0.1); }
+        .podium-entry { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        
+        .podium-cube { 
+            width: 80px; 
+            border-radius: 8px 8px 0 0; 
+            display: flex; align-items: flex-start; justify-content: center; 
+            padding-top: 15px;
+            font-family: 'Orbitron', sans-serif; font-size: 36px; font-weight: 900; 
+            color: #0f172a;
+            background: var(--podium-color); 
+            border: 2px solid rgba(255,255,255,0.8);
+            box-shadow: 0 0 30px var(--podium-color), inset 0 10px 20px rgba(255,255,255,0.5); 
+            transition: all 0.5s ease;
+        }
+        
+        .podium-name { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 700; color: var(--podium-color); text-shadow: 0 0 10px var(--podium-color); }
+        .podium-territory { font-size: 14px; color: #94a3b8; font-weight: 600; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 4px; }
+        
+        .btn-replay { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 4px; padding: 16px 56px; background: rgba(6,182,212,0.1); border: 2px solid #06B6D4; border-radius: 8px; color: #06B6D4; cursor: pointer; transition: all 0.2s; margin-top: 20px; }
+        .btn-replay:hover { background: rgba(6,182,212,0.3); box-shadow: 0 0 30px rgba(6,182,212,0.6); transform: translateY(-3px); }
+        
+        #game-canvas { display: none; position: fixed; inset: 0; }
+        #game-canvas.visible { display: block; }
+
+    </style>
 </head>
-<body class="projector-page">
-    <script src="/projector.js"></script>
+<body>
+
+<div id="lobby-screen">
+    <div class="logo-title">CHROMATRACE</div>
+    <div class="lobby-panels">
+        <div class="panel connect-panel">
+            <div class="panel-title">⚡ Rejoindre</div>
+            <div class="connect-url" id="server-url">192.168.x.x:3000/controller.html</div>
+            <p class="connect-hint">Connectez-vous au même réseau Wi-Fi<br>puis ouvrez l'URL dans votre navigateur</p>
+        </div>
+        <div class="panel players-panel">
+            <div class="panel-title">Joueurs connectés</div>
+            <div class="player-count">
+                <span id="player-count-num" style="color:#06B6D4">0</span>
+                <span style="font-size:16px; color:#475569"> / 30</span>
+            </div>
+            <div id="player-list"></div>
+        </div>
+        <div class="panel settings-panel">
+            <div class="panel-title">⚙ Paramètres</div>
+            <div class="setting-row">
+                <span class="setting-label">Durée</span>
+                <div class="setting-value">
+                    <button class="btn-small" onclick="changeDuration(-30)">−</button>
+                    <span class="value-display" id="duration-display">3:00</span>
+                    <button class="btn-small" onclick="changeDuration(30)">+</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Items</span>
+                <button class="toggle-btn on" id="items-toggle" onclick="toggleItems()">ON</button>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Vitesse bonus</span>
+                <button class="toggle-btn on" id="boost-toggle" onclick="toggleBoost()">ON</button>
+            </div>
+        </div>
+    </div>
+    <button class="btn-start" id="start-btn" onclick="startGame()" disabled>
+        LANCER LA PARTIE
+    </button>
+</div>
+
+<div id="hud">
+    <div class="hud-top">
+        <div id="leaderboard">
+            <div class="lb-title">CLASSEMENT</div>
+            <div id="lb-entries"></div>
+        </div>
+        <div class="hud-timer" id="timer-display">3:00</div>
+        <div style="min-width:220px"></div>
+    </div>
+</div>
+
+<div id="game-canvas"></div>
+
+<div id="end-screen">
+    <div class="end-title">FIN DE PARTIE</div>
+    <div class="podium" id="podium"></div>
+    <button class="btn-replay" onclick="resetGame()">↺  REJOUER</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="projector.js"></script>
+<script src="main.js"></script>
 </body>
 </html>

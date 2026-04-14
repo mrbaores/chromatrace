@@ -3,12 +3,37 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
+const os = require('os');
+function getLocalIp() {
+    const interfaces = os.networkInterfaces();
+    for (const devName in interfaces) {
+        const iface = interfaces[devName];
+        for (let i = 0; i < iface.length; i++) {
+            const alias = iface[i];
+            if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+                return alias.address;
+            }
+        }
+    }
+    return '127.0.0.1';
+}
+const MY_REAL_IP = getLocalIp();
+
+let currentGameState = 'LOBBY'; 
+let gameSettings = {
+    durationSec: 180, // 3 minutes par défaut
+    itemsEnabled: true,
+    boostEnabled: true
+};
+let timeRemaining = 0;
+let gameTimerInterval = null;
+
 const PORT = process.env.PORT || 3000;
 const COLS = 80;
 const ROWS = 45;
 const CELL_SIZE = 16;
-const TICK_MS = 80;
-const STATE_MS = 80;
+const TICK_MS = 100;
+const STATE_MS = 100;
 const DISCONNECT_GRACE_MS = 3000;
 const RESPAWN_MS = 2000;
 const ITEM_MIN_MS = 6000;
@@ -18,14 +43,8 @@ const SHIELD_MS = 5000;
 const BASE_RADIUS = 1;
 
 const COLORS = [
-    '#06b6d4',
-    '#d946ef',
-    '#84cc16',
-    '#eab308',
-    '#f97316',
-    '#fb7185',
-    '#60a5fa',
-    '#14b8a6'
+    '#06b6d4', '#d946ef', '#84cc16', '#eab308',
+    '#f97316', '#fb7185', '#60a5fa', '#14b8a6'
 ];
 
 const SPAWN_POINTS = [
@@ -83,7 +102,6 @@ function chooseDirection(inputX, inputY, fallbackX, fallbackY) {
         newDy = inputY >= 0 ? 1 : -1;
     }
 
-    
     if (newDx === -fallbackX && fallbackX !== 0) return { dx: fallbackX, dy: fallbackY };
     if (newDy === -fallbackY && fallbackY !== 0) return { dx: fallbackX, dy: fallbackY };
 
@@ -109,11 +127,9 @@ function getUsedColors() {
 
 function chooseColor(preferredColor) {
     const used = getUsedColors();
-
     if (preferredColor && !used.has(preferredColor.toLowerCase())) {
         return preferredColor;
     }
-
     const freeColor = COLORS.find((color) => !used.has(color.toLowerCase()));
     return freeColor || COLORS[randomInt(0, COLORS.length - 1)];
 }
@@ -228,12 +244,8 @@ function captureArea(player) {
     }
 
     function enqueueIfFree(x, y) {
-        if (x < 0 || x >= COLS || y < 0 || y >= ROWS) {
-            return;
-        }
-        if (blocked[y][x] || visited[y][x]) {
-            return;
-        }
+        if (x < 0 || x >= COLS || y < 0 || y >= ROWS) { return; }
+        if (blocked[y][x] || visited[y][x]) { return; }
         visited[y][x] = true;
         queue.push({ x, y });
     }
@@ -273,9 +285,7 @@ function captureArea(player) {
 
 function pickupItem(player) {
     const index = state.items.findIndex((item) => item.x === player.x && item.y === player.y);
-    if (index === -1) {
-        return;
-    }
+    if (index === -1) { return; }
 
     const item = state.items[index];
     state.items.splice(index, 1);
@@ -289,9 +299,7 @@ function pickupItem(player) {
 }
 
 function spawnItemIfNeeded(now) {
-    if (now < state.nextItemAt || state.items.length >= 4) {
-        return;
-    }
+    if (now < state.nextItemAt || state.items.length >= 4) { return; }
 
     for (let attempt = 0; attempt < 50; attempt += 1) {
         const x = randomInt(2, COLS - 3);
@@ -308,40 +316,27 @@ function spawnItemIfNeeded(now) {
             break;
         }
     }
-
     state.nextItemAt = now + randomInt(ITEM_MIN_MS, ITEM_MAX_MS);
 }
 
 function handleTrailCollisions(currentPlayer, now) {
     for (const target of state.players.values()) {
-        if (!target.alive) {
-            continue;
-        }
-
-        if (target.shieldUntil > now) {
-            continue;
-        }
-
-        if (!target.trailSet.has(cellKey(currentPlayer.x, currentPlayer.y))) {
-            continue;
-        }
+        if (!target.alive) continue;
+        if (target.shieldUntil > now) continue;
+        if (!target.trailSet.has(cellKey(currentPlayer.x, currentPlayer.y))) continue;
 
         if (target.numId === currentPlayer.numId) {
             killPlayer(currentPlayer, 'Tu as coupé ta propre trace.');
             return true;
         }
-
         killPlayer(target, `${currentPlayer.name} a coupé ta trace.`);
         return false;
     }
-
     return false;
 }
 
 function movePlayer(player, now) {
-    if (!player.alive) {
-        return;
-    }
+    if (!player.alive) return;
 
     const baseSteps = player.boostUntil > now ? 2 : 1;
 
@@ -359,9 +354,7 @@ function movePlayer(player, now) {
         }
 
         const selfDied = handleTrailCollisions(player, now);
-        if (selfDied || !player.alive) {
-            return;
-        }
+        if (selfDied || !player.alive) return;
 
         const owner = state.grid[player.y][player.x];
 
@@ -399,7 +392,6 @@ function respawnWaitingPlayers(now) {
 
 function buildPublicState() {
     rebuildScores();
-
     const players = Array.from(state.players.values())
         .map((player) => ({
             id: player.id,
@@ -428,7 +420,8 @@ function buildPublicState() {
         connectedPlayers: players.length,
         top5: players.slice(0, 5),
         controllerUrl: '/controller.html',
-        elapsedMs: Date.now() - state.startedAt
+        elapsedMs: Date.now() - state.startedAt,
+        serverIp: MY_REAL_IP 
     };
 }
 
@@ -437,9 +430,7 @@ function emitState() {
     io.emit('state', publicState);
 
     for (const player of state.players.values()) {
-        if (!player.socketId) {
-            continue;
-        }
+        if (!player.socketId) continue;
         io.to(player.socketId).emit('selfState', {
             name: player.name,
             color: player.color,
@@ -453,13 +444,12 @@ function emitState() {
     }
 }
 
+// ==========================================
+// SOCKET.IO LOGIC
+// ==========================================
 io.on('connection', (socket) => {
     socket.emit('welcome', {
-        cols: COLS,
-        rows: ROWS,
-        cellSize: CELL_SIZE,
-        colors: COLORS,
-        controllerUrl: '/controller.html'
+        cols: COLS, rows: ROWS, cellSize: CELL_SIZE, colors: COLORS, controllerUrl: '/controller.html'
     });
 
     socket.on('joinGame', (payload, callback) => {
@@ -468,27 +458,11 @@ io.on('connection', (socket) => {
         const color = chooseColor(payload?.color);
 
         const player = {
-            id: socket.id,
-            socketId: socket.id,
-            numId: state.nextPlayerNumId,
-            name,
-            color,
-            x: 1,
-            y: 1,
-            dirX: 1,
-            dirY: 0,
-            inputX: 1,
-            inputY: 0,
-            alive: false,
-            respawnAt: 0,
-            lastDeathReason: '',
-            trail: [],
-            trailSet: new Set(),
-            outside: false,
-            score: 0,
-            boostUntil: 0,
-            shieldUntil: 0,
-            disconnectedAt: 0
+            id: socket.id, socketId: socket.id, numId: state.nextPlayerNumId,
+            name, color, x: 1, y: 1, dirX: 1, dirY: 0, inputX: 1, inputY: 0,
+            alive: false, respawnAt: 0, lastDeathReason: '',
+            trail: [], trailSet: new Set(), outside: false, score: 0,
+            boostUntil: 0, shieldUntil: 0, disconnectedAt: 0
         };
 
         state.nextPlayerNumId += 1;
@@ -496,24 +470,53 @@ io.on('connection', (socket) => {
         state.socketToPlayer.set(socket.id, player.id);
         respawnPlayer(player);
 
-        callback?.({
-            ok: true,
-            id: player.id,
-            numId: player.numId,
-            name: player.name,
-            color: player.color
-        });
+        callback?.({ ok: true, id: player.id, numId: player.numId, name: player.name, color: player.color });
+    });
+
+    socket.on('adminUpdateSettings', (newSettings) => {
+        gameSettings = { ...gameSettings, ...newSettings };
+        io.emit('settingsUpdated', gameSettings);
+    });
+
+    socket.on('adminStartGame', () => {
+        //if (currentGameState !== 'LOBBY' && currentGameState !== 'FINISHED') return;
+        
+        currentGameState = 'PLAYING';
+        timeRemaining = gameSettings.durationSec;
+        state.startedAt = Date.now();
+        state.items = []; 
+        state.grid = createGrid(); 
+
+        for (const player of state.players.values()) {
+            respawnPlayer(player);
+        }
+
+        io.emit('gameStateChanged', { state: 'PLAYING', timeRemaining });
+
+        clearInterval(gameTimerInterval);
+        gameTimerInterval = setInterval(() => {
+            timeRemaining -= 1;
+            io.emit('timeUpdate', timeRemaining); 
+            if (timeRemaining <= 0) {
+                endGame();
+            }
+        }, 1000);
+    });
+
+    socket.on('adminResetGame', () => {
+        currentGameState = 'LOBBY';
+        state.grid = createGrid();
+        for (const player of state.players.values()) {
+            killPlayer(player, "Reset");
+        }
+        io.emit('gameStateChanged', { state: 'LOBBY' });
     });
 
     socket.on('playerInput', (payload) => {
         const playerId = state.socketToPlayer.get(socket.id);
-        if (!playerId) {
-            return;
-        }
+        if (!playerId) return;
         const player = state.players.get(playerId);
-        if (!player) {
-            return;
-        }
+        if (!player) return;
 
         player.disconnectedAt = 0;
         player.socketId = socket.id;
@@ -524,15 +527,9 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         const playerId = state.socketToPlayer.get(socket.id);
         state.socketToPlayer.delete(socket.id);
-
-        if (!playerId) {
-            return;
-        }
-
+        if (!playerId) return;
         const player = state.players.get(playerId);
-        if (!player) {
-            return;
-        }
+        if (!player) return;
 
         player.disconnectedAt = Date.now();
         player.socketId = null;
@@ -541,24 +538,47 @@ io.on('connection', (socket) => {
     });
 });
 
+// ==========================================
+// MAIN LOOPS
+// ==========================================
+
 setInterval(() => {
     const now = Date.now();
     removeExpiredPlayers(now);
-    respawnWaitingPlayers(now);
-    spawnItemIfNeeded(now);
+    
+    // 只有在 PLAYING 状态下，才允许复活、刷道具和移动
+    if (currentGameState === 'PLAYING') {
+        respawnWaitingPlayers(now);
+        if (gameSettings.itemsEnabled) spawnItemIfNeeded(now);
 
-    for (const player of state.players.values()) {
-        if (player.disconnectedAt) {
-            continue;
+        for (const player of state.players.values()) {
+            if (!player.disconnectedAt) {
+                movePlayer(player, now);
+            }
         }
-        movePlayer(player, now);
     }
 }, TICK_MS);
 
 setInterval(() => {
-    emitState();
+    emitState(); 
 }, STATE_MS);
 
+
+// ==========================================
+// STARTUP & GAME END
+// ==========================================
 server.listen(PORT, () => {
     console.log(`CHROMATRACE lancé sur http://localhost:${PORT}`);
 });
+
+function endGame() {
+    currentGameState = 'FINISHED';
+    clearInterval(gameTimerInterval);
+    
+    const top3 = Array.from(state.players.values())
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map(p => ({ name: p.name, color: p.color, score: p.score }));
+
+    io.emit('gameStateChanged', { state: 'FINISHED', podium: top3 });
+}

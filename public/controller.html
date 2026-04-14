@@ -1,57 +1,245 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CHROMATRACE - Manette</title>
-    <link rel="stylesheet" href="/style.css" />
-    <script src="/socket.io/socket.io.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CHROMATRACE — Manette</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        html, body { 
+            width:100%; height:100%; overflow:hidden; 
+            background:#0f172a; font-family:'Rajdhani',sans-serif; 
+            color:#e2e8f0; touch-action:none; 
+            -webkit-user-select: none; user-select: none; 
+        }
+
+        .screen { 
+            position:absolute; 
+            inset:0; 
+            display:flex; 
+            flex-direction:column; 
+            align-items:center; 
+            justify-content:center; 
+            gap:24px; 
+            padding:24px;
+            z-index: 10;
+            background:#0f172a; 
+        }
+
+        .screen.hidden { display:none !important; }
+
+        #screen-login { background:radial-gradient(ellipse at 50% 30%, #1e293b 0%, #0f172a 70%); }
+        #screen-login::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(6,182,212,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(6,182,212,0.04) 1px,transparent 1px); background-size:30px 30px; pointer-events:none; }
+        
+        .mobile-logo { font-family:'Orbitron',sans-serif; font-size:28px; font-weight:900; letter-spacing:4px; background:linear-gradient(90deg,#06B6D4,#D946EF); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .login-subtitle { font-size:14px; color:#475569; letter-spacing:2px; text-transform:uppercase; }
+        .input-group { width:100%; max-width:300px; display:flex; flex-direction:column; gap:8px; }
+        .input-label { font-size:12px; letter-spacing:3px; text-transform:uppercase; color:#06B6D4; }
+        .pseudo-input { width:100%; padding:14px 16px; background:rgba(255,255,255,0.05); border:1px solid rgba(6,182,212,0.3); border-radius:8px; color:#e2e8f0; font-family:'Orbitron',sans-serif; font-size:18px; text-align:center; outline:none; }
+        
+        .color-grid { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:300px; }
+        .color-option { width:40px; height:40px; border-radius:8px; cursor:pointer; border:3px solid transparent; transition:all 0.15s; position:relative; }
+        .color-option.selected { border-color:#ffffff; transform:scale(1.15); box-shadow:0 0 15px var(--c); }
+        .color-option::after { content:'✓'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:white; font-size:18px; font-weight:bold; opacity:0; }
+        .color-option.selected::after { opacity:1; }
+        
+        .btn-join { width:100%; max-width:300px; padding:16px; background:linear-gradient(135deg,#06B6D4,#0891b2); border:none; border-radius:10px; color:#0f172a; font-family:'Orbitron',sans-serif; font-size:16px; font-weight:700; cursor:pointer; }
+
+        #screen-game { background:#050d1a; z-index: 20; }
+        .game-info-bar { 
+            position:absolute; top:0; left:0; right:0; 
+            display:flex; justify-content:space-between; align-items:center; 
+            padding:12px 16px; background:rgba(15,23,42,0.9); 
+            border-bottom:1px solid rgba(255,255,255,0.08); 
+        }
+        .info-item { display:flex; flex-direction:column; align-items:center; }
+        .info-label { font-size:10px; color:#475569; text-transform:uppercase; }
+        .info-value { font-family:'Orbitron',sans-serif; font-size:16px; font-weight:700; }
+
+        #joystick-zone { 
+            flex: 1; 
+            width: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        #joystick-area { 
+            width: 200px; height: 200px; 
+            border-radius: 50%; 
+            background: rgba(6, 182, 212, 0.05); 
+            border: 1px solid rgba(6, 182, 212, 0.1);
+        }
+
+        .items-bar { display:flex; gap:12px; margin-bottom: 20px; }
+
+        .item-indicator { 
+            width: 44px; 
+            height: 44px; 
+            background: rgba(15,23,42,0.9); 
+            border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 8px; 
+            padding: 6px; 
+            opacity: 0.2; 
+            transition: all 0.3s; 
+            object-fit: contain; 
+            image-rendering: pixelated; 
+        }
+        .item-indicator.active { 
+            opacity: 1; 
+            box-shadow: 0 0 15px #06B6D4; 
+            transform: scale(1.1); 
+        }
+    </style>
 </head>
-<body class="controller-page">
-    <main class="controller-app">
-        <section id="join-screen" class="card neon-card">
-            <h1 class="logo-title">CHROMATRACE</h1>
-            <p class="subtitle">Entre ton pseudo et choisis ta couleur.</p>
+<body>
 
-            <label class="field-label" for="player-name">Pseudo</label>
-            <input id="player-name" class="text-input" type="text" maxlength="14" placeholder="Ex: Cyber_01" />
+    <div class="screen" id="screen-login">
+        <div class="mobile-logo">CHROMATRACE</div>
+        <div class="login-subtitle">Rejoindre la partie</div>
+        <div class="input-group">
+            <div class="input-label">Pseudo</div>
+            <input type="text" class="pseudo-input" id="pseudo-input" placeholder="TON NOM" maxlength="12">
+        </div>
+        <div class="color-label">Couleur</div>
+        <div class="color-grid" id="color-grid"></div>
+        <div class="error-msg" id="error-msg" style="color:red; font-size:12px"></div>
+        <button class="btn-join" onclick="joinGame()">REJOINDRE</button>
+    </div>
 
-            <p class="field-label">Couleur</p>
-            <div id="color-list" class="color-list"></div>
+    <div class="screen hidden" id="screen-lobby">
+        <div class="lobby-pseudo" id="lobby-pseudo-display">--</div>
+        <div class="lobby-status">En attente du lancement...</div>
+        <div class="waiting-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
 
-            <button id="join-button" class="main-button">REJOINDRE</button>
-            <p id="join-message" class="helper-text"></p>
-        </section>
+    <div class="screen hidden" id="screen-game">
+        <div class="game-info-bar">
+            <div class="info-item"><span class="info-label">Pseudo</span><span id="game-pseudo" class="info-value">--</span></div>
+            <div class="info-item"><span class="info-label">Surface</span><span id="game-territory" class="info-value">0</span></div>
+            <div class="info-item"><span class="info-label">Statut</span><span id="game-status" class="info-value" style="color:#84CC16">Vivant</span></div>
+        </div>
+        <div id="joystick-zone"><div id="joystick-area"></div></div>
+        
+        <div class="items-bar">
+            <img src="assets/boost.png" class="item-indicator" id="indicator-boost" alt="Boost">
+            <img src="assets/shield.png" class="item-indicator" id="indicator-shield" alt="Shield">
+        </div>
+    </div>
 
-        <section id="play-screen" class="play-screen hidden">
-            <header class="hud-row card neon-card">
-                <div>
-                    <span class="mini-label">PSEUDO</span>
-                    <strong id="hud-name">---</strong>
-                </div>
-                <div>
-                    <span class="mini-label">SURFACE</span>
-                    <strong id="hud-score">0</strong>
-                </div>
-                <div>
-                    <span class="mini-label">STATUT</span>
-                    <strong id="hud-status">Vivant</strong>
-                </div>
-            </header>
+    <div class="screen hidden" id="screen-eliminated">
+        <h2 style="color:#EF4444; font-family:'Orbitron'">ÉLIMINÉ</h2>
+        <p>Respawn dans quelques secondes...</p>
+    </div>
 
-            <section class="joystick-wrapper card neon-card">
-                <div id="joystick-base" class="joystick-base">
-                    <div id="joystick-knob" class="joystick-knob"></div>
-                </div>
-            </section>
+    <div class="screen hidden" id="screen-end">
+        <h2 class="mobile-logo">FIN</h2>
+        <p>Regarde l'écran géant !</p>
+    </div>
 
-            <footer class="status-row card neon-card">
-                <span id="status-boost" class="status-pill">Boost OFF</span>
-                <span id="status-shield" class="status-pill">Shield OFF</span>
-            </footer>
-        </section>
-    </main>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const COLORS = ["#06B6D4","#D946EF","#84CC16","#EAB308","#F97316","#EF4444","#8B5CF6","#10B981","#EC4899","#3B82F6","#F43F5E","#14B8A6"];
+    let selectedColor = COLORS[0];
+    let myPseudo = "";
+    let socket = null;
+    let joystick = null;
+    let joined = false;
+    let currentGameState = 'LOBBY';
 
-    <script src="/controller.js"></script>
+    function initColorGrid() {
+        const grid = document.getElementById("color-grid");
+        COLORS.forEach((color, i) => {
+            const btn = document.createElement("div");
+            btn.className = "color-option" + (i === 0 ? " selected" : "");
+            btn.style.background = color;
+            btn.style.setProperty("--c", color);
+            btn.onclick = () => {
+                document.querySelectorAll(".color-option").forEach(b => b.classList.remove("selected"));
+                btn.classList.add("selected");
+                selectedColor = color;
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
+        document.getElementById(id).classList.remove("hidden");
+        if (id === "screen-game") initJoystick();
+    }
+
+    function connectSocket() {
+        socket = io();
+        socket.on('gameStateChanged', (payload) => {
+            currentGameState = payload.state || payload;
+            if (!joined) {
+                showScreen("screen-login");
+                return;
+            }
+            if (currentGameState === 'LOBBY') showScreen("screen-lobby");
+            else if (currentGameState === 'PLAYING') showScreen("screen-game");
+            else if (currentGameState === 'FINISHED') showScreen("screen-end");
+        });
+
+        socket.on('selfState', (payload) => {
+            if (!joined) return;
+            document.getElementById("game-territory").textContent = payload.score;
+            document.getElementById("indicator-boost").classList.toggle("active", payload.boost);
+            document.getElementById("indicator-shield").classList.toggle("active", payload.shield);
+
+            if (!payload.alive && currentGameState === 'PLAYING') {
+                showScreen("screen-eliminated");
+            } else if (payload.alive && currentGameState === 'PLAYING') {
+                if (!document.getElementById("screen-eliminated").classList.contains("hidden")) {
+                    showScreen("screen-game");
+                }
+            }
+        });
+    }
+
+    function joinGame() {
+        const input = document.getElementById("pseudo-input");
+        const name = input.value.trim();
+        if (name.length < 2) return;
+
+        socket.emit('joinGame', { name, color: selectedColor }, (res) => {
+            if (res && res.ok) {
+                joined = true;
+                myPseudo = name;
+                document.getElementById("lobby-pseudo-display").textContent = name;
+                document.getElementById("lobby-pseudo-display").style.color = selectedColor;
+                document.getElementById("game-pseudo").textContent = name;
+                document.getElementById("game-pseudo").style.color = selectedColor;
+                
+                if (currentGameState === 'PLAYING') showScreen("screen-game");
+                else showScreen("screen-lobby");
+            }
+        });
+    }
+
+    function initJoystick() {
+        if (joystick) { joystick.destroy(); joystick = null; }
+        setTimeout(() => {
+            joystick = nipplejs.create({
+                zone: document.getElementById("joystick-area"),
+                mode: "static",
+                position: { left: "50%", top: "50%" },
+                color: selectedColor,
+                size: 150
+            });
+            joystick.on("move", (evt, data) => {
+                socket.emit('playerInput', { x: data.vector.x, y: -data.vector.y });
+            });
+            joystick.on("end", () => {
+                socket.emit('playerInput', { x: 0, y: 0 });
+            });
+        }, 100);
+    }
+
+    initColorGrid();
+    connectSocket();
+</script>
 </body>
 </html>
