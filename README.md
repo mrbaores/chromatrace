@@ -1,70 +1,57 @@
-# CHROMATRACE - Prototype Phaser + Socket.io
+# CHROMATRACE - Jeu Multijoueur Colocalisé
 
-Prototype jouable inspiré du GDD de **CHROMATRACE / La Conquête de Territoire**.
+## 🎮 Vue d'ensemble
+CHROMATRACE est un jeu massivement multijoueur colocalisé (30+ joueurs) combinant des contrôles mobiles en temps réel avec un affichage partagé sur grand écran.
 
-## Contenu
+## 📁 Architecture du Projet
 
-- **Projecteur** : écran principal Phaser sur `http://localhost:3000/`
-- **Manette smartphone** : interface tactile sur `http://localhost:3000/controller.html`
-- **Serveur Node.js + Socket.io** : logique temps réel, grille, captures, collisions, items
+```
+chromatrace/
+├── server.js                 # Serveur Node.js + Socket.io (cœur du jeu)
+├── package.json             # Dépendances du projet
+├── README.md                # Documentation
+│
+└── public/                  # Fichiers web statiques
+    ├── index.html          # Page projecteur (affichage groupe)
+    ├── controller.html     # Page manette (téléphone)
+    │
+    ├── assets/             # Ressources (images, styles)
+    │   ├── sprites/        # Spritesheets Phaser
+    │   │   ├── player_cubes.png
+    │   │   └── items.png
+    │   └── styles/         # Feuilles de style
+    │       └── style.css
+    │
+    └── js/                 # Code JavaScript
+        ├── projector.js    # Rendu Phaser (affichage)
+        └── controller.js   # Contrôle mobile (joystick)
+```
 
-## Fonctionnalités incluses
-
-- capture de territoire par fermeture de boucle
-- élimination si un joueur coupe une trace
-- élimination si on touche le bord
-- respawn automatique après 2 secondes
-- items **Boost** et **Shield**
-- leaderboard en temps réel
-- style visuel cyber-néon sans assets externes
-
-## Installation
+## 🚀 Démarrage
 
 ```bash
 npm install
 npm start
+# Serveur lancé sur http://localhost:3000
 ```
 
-Puis ouvrir :
+**Affichage projecteur:** http://localhost:3000/
+**Manette mobile:** http://localhost:3000/controller.html
 
-- projecteur : `http://localhost:3000/`
-- téléphone/manette : `http://localhost:3000/controller.html`
+## 🎯 Caractéristiques
 
-## Commandes utiles
+- **30+ joueurs simultanés** avec gestion robuste
+- **16 couleurs neon** pour identifier les joueurs
+- **Joystick mobile** avec feedback visuel
+- **Capture de territoire** avec algorithme Flood Fill
+- **Items bonus:** Boost (2x vitesse) et Shield (protection)
+- **Leaderboard TOP 5** en temps réel
+- **Interface Cyber-Neon** avec animations
 
-### Installer les dépendances
-```bash
-npm install
-```
+## 🔧 Optimisations
 
-### Lancer le serveur
-```bash
-npm start
-```
-
-### Lancer en mode développement
-```bash
-npm run dev
-```
-
-## Structure
-
-```text
-chromatrace-phaser/
-├── package.json
-├── server.js
-├── README.md
-└── public/
-    ├── index.html
-    ├── controller.html
-    ├── projector.js
-    ├── controller.js
-    └── style.css
-```
-
-## Remarques
-
-- Ce prototype est volontairement simple et autonome.
-- Il ne dépend d'aucun sprite externe.
-- Le rendu est basé sur des formes dessinées par le code.
-- La logique reste assez proche du GDD, mais sans optimisation avancée de type Quadtree.
+1. **14 spawn points** répartis sur la map
+2. **16 couleurs neon** distinctes
+3. **Validation inputs** pour stabilité
+4. **Gestion d'erreurs** et timeout
+5. **Performance optimisée** pour 30+ joueurs

@@ -18,25 +18,27 @@ const SHIELD_MS = 5000;
 const BASE_RADIUS = 1;
 
 const COLORS = [
-    '#06b6d4',
-    '#d946ef',
-    '#84cc16',
-    '#eab308',
-    '#f97316',
-    '#fb7185',
-    '#60a5fa',
-    '#14b8a6'
+    '#06b6d4', '#d946ef', '#84cc16', '#eab308',
+    '#f97316', '#fb7185', '#60a5fa', '#14b8a6',
+    '#34d399', '#a78bfa', '#f87171', '#fbbf24',
+    '#4ade80', '#38bdf8', '#ec4899', '#8b5cf6'
 ];
 
 const SPAWN_POINTS = [
-    { x: 8, y: 8 },
-    { x: COLS - 9, y: 8 },
-    { x: 8, y: ROWS - 9 },
-    { x: COLS - 9, y: ROWS - 9 },
-    { x: Math.floor(COLS / 2), y: 8 },
-    { x: Math.floor(COLS / 2), y: ROWS - 9 },
-    { x: 8, y: Math.floor(ROWS / 2) },
-    { x: COLS - 9, y: Math.floor(ROWS / 2) }
+    { x: 8, y: 8 }, { x: COLS - 9, y: 8 },
+    { x: 8, y: ROWS - 9 }, { x: COLS - 9, y: ROWS - 9 },
+    { x: Math.floor(COLS / 2), y: 8 }, { x: Math.floor(COLS / 2), y: ROWS - 9 },
+    { x: 8, y: Math.floor(ROWS / 2) }, { x: COLS - 9, y: Math.floor(ROWS / 2) },
+    { x: 12, y: 12 }, { x: COLS - 13, y: 12 },
+    { x: 12, y: ROWS - 13 }, { x: COLS - 13, y: ROWS - 13 },
+    { x: Math.floor(COLS * 0.3), y: Math.floor(ROWS * 0.3) },
+    { x: Math.floor(COLS * 0.7), y: Math.floor(ROWS * 0.3) },
+    { x: Math.floor(COLS * 0.3), y: Math.floor(ROWS * 0.7) },
+    { x: Math.floor(COLS * 0.7), y: Math.floor(ROWS * 0.7) },
+    { x: Math.floor(COLS / 3), y: Math.floor(ROWS / 3) },
+    { x: Math.floor(COLS * 2 / 3), y: Math.floor(ROWS / 3) },
+    { x: Math.floor(COLS / 3), y: Math.floor(ROWS * 2 / 3) },
+    { x: Math.floor(COLS * 2 / 3), y: Math.floor(ROWS * 2 / 3) }
 ];
 
 const app = express();
@@ -507,8 +509,12 @@ io.on('connection', (socket) => {
 
         player.disconnectedAt = 0;
         player.socketId = socket.id;
-        player.inputX = clamp(Number(payload?.x) || 0, -1, 1);
-        player.inputY = clamp(Number(payload?.y) || 0, -1, 1);
+
+        // Validation et normalisation des inputs
+        const x = Number(payload?.x) || 0;
+        const y = Number(payload?.y) || 0;
+        player.inputX = Math.max(-1, Math.min(1, x));
+        player.inputY = Math.max(-1, Math.min(1, y));
     });
 
     socket.on('disconnect', () => {

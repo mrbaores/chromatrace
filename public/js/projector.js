@@ -19,9 +19,9 @@ class ChromaScene extends Phaser.Scene {
     // 1. CHARGEMENT DES IMAGES (SPRITESHEETS)
     // -------------------------------------------------------
     preload() {
-        // IMPORTANT : Ajuste frameWidth et frameHeight avec la taille exacte d'un cube/item en pixels
-        this.load.spritesheet('player_cubes', '/player_cubes.png', { frameWidth: 32, frameHeight: 32 });
-        this.load.spritesheet('items', '/items.png', { frameWidth: 32, frameHeight: 32 });
+        // Chargement des spritesheets depuis le dossier assets
+        this.load.spritesheet('player_cubes', '/assets/sprites/player_cubes.png', { frameWidth: 32, frameHeight: 32 });
+        this.load.spritesheet('items', '/assets/sprites/items.png', { frameWidth: 32, frameHeight: 32 });
     }
 
     create() {

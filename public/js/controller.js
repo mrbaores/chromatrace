@@ -76,7 +76,19 @@ joinButton.addEventListener('click', () => {
     }
 
     const name = playerNameInput.value.trim();
+    let responded = false;
+
+    // Timeout après 5 secondes si pas de réponse
+    const timeout = setTimeout(() => {
+        if (!responded) {
+            joinMessage.textContent = 'Connexion au serveur échouée. Réessayez.';
+        }
+    }, 5000);
+
     socket.emit('joinGame', { name, color: selectedColor }, (response) => {
+        responded = true;
+        clearTimeout(timeout);
+
         if (!response?.ok) {
             joinMessage.textContent = 'Impossible de rejoindre la partie.';
             return;
@@ -91,8 +103,9 @@ joinButton.addEventListener('click', () => {
 
 function setKnob(x, y) {
     const radius = joystickBase.clientWidth / 2;
-    joystickKnob.style.left = `${radius + x * radius * 0.6}px`;
-    joystickKnob.style.top = `${radius + y * radius * 0.6}px`;
+    const offsetX = x * radius * 0.6;
+    const offsetY = y * radius * 0.6;
+    joystickKnob.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
 }
 
 function updateVectorFromPointer(clientX, clientY) {
