@@ -7,8 +7,8 @@ const PORT = process.env.PORT || 3000;
 const COLS = 80;
 const ROWS = 45;
 const CELL_SIZE = 16;
-const TICK_MS = 120;
-const STATE_MS = 100;
+const TICK_MS = 80;
+const STATE_MS = 80;
 const DISCONNECT_GRACE_MS = 3000;
 const RESPAWN_MS = 2000;
 const ITEM_MIN_MS = 6000;
@@ -29,14 +29,14 @@ const COLORS = [
 ];
 
 const SPAWN_POINTS = [
-    { x: 8, y: 8 },
-    { x: COLS - 9, y: 8 },
-    { x: 8, y: ROWS - 9 },
-    { x: COLS - 9, y: ROWS - 9 },
-    { x: Math.floor(COLS / 2), y: 8 },
+    { x: 12, y: 15 },
+    { x: COLS - 13, y: 15 }, 
+    { x: 12, y: ROWS - 9 },
+    { x: COLS - 13, y: ROWS - 9 },
+    { x: Math.floor(COLS / 2), y: 15 },
     { x: Math.floor(COLS / 2), y: ROWS - 9 },
-    { x: 8, y: Math.floor(ROWS / 2) },
-    { x: COLS - 9, y: Math.floor(ROWS / 2) }
+    { x: 12, y: Math.floor(ROWS / 2) },
+    { x: COLS - 13, y: Math.floor(ROWS / 2) }
 ];
 
 const app = express();
@@ -74,10 +74,20 @@ function chooseDirection(inputX, inputY, fallbackX, fallbackY) {
         return { dx: fallbackX, dy: fallbackY };
     }
 
+    let newDx = 0;
+    let newDy = 0;
+
     if (Math.abs(inputX) >= Math.abs(inputY)) {
-        return { dx: inputX >= 0 ? 1 : -1, dy: 0 };
+        newDx = inputX >= 0 ? 1 : -1;
+    } else {
+        newDy = inputY >= 0 ? 1 : -1;
     }
-    return { dx: 0, dy: inputY >= 0 ? 1 : -1 };
+
+    
+    if (newDx === -fallbackX && fallbackX !== 0) return { dx: fallbackX, dy: fallbackY };
+    if (newDy === -fallbackY && fallbackY !== 0) return { dx: fallbackX, dy: fallbackY };
+
+    return { dx: newDx, dy: newDy };
 }
 
 function findPlayerByNumId(numId) {
