@@ -62,9 +62,3 @@ chromatrace-phaser/
     └── style.css
 ```
 
-## Remarques
-
-- Ce prototype est volontairement simple et autonome.
-- Il ne dépend d'aucun sprite externe.
-- Le rendu est basé sur des formes dessinées par le code.
-- La logique reste assez proche du GDD, mais sans optimisation avancée de type Quadtree.
